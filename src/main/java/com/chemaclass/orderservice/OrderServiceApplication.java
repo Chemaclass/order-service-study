@@ -6,9 +6,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
-import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.StateMachineFactory;
@@ -52,13 +50,15 @@ class Runner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        StateMachine<OrderStates, OrderEvents> machine = this.factory.getStateMachine("anyId");
+        var orderId = 12345L;
+        var machine = this.factory.getStateMachine(Long.toString(orderId));
+        machine.getExtendedState().getVariables().put("orderId", orderId);
         machine.start();
         log.info("INIT state: " + machine.getState().getId().name());
         machine.sendEvent(OrderEvents.PAY);
         log.info("Current state: " + machine.getState().getId().name());
 
-        Message<OrderEvents> events = MessageBuilder
+        var events = MessageBuilder
             .withPayload(OrderEvents.FULFILL)
             .setHeader("name", "value")
             .build();
@@ -89,9 +89,14 @@ class SimpleEnumStateMachineConfiguration extends StateMachineConfigurerAdapter<
         states
             .withStates()
             .initial(OrderStates.SUBMITTED)
-            .state(OrderStates.PAID)
+            .stateEntry(OrderStates.SUBMITTED, context -> {
+                Long orderId = (Long) context.getExtendedState().getVariables().getOrDefault("orderId", 1L);
+                log.info("orderId is: " + orderId);
+                log.info("entering ");
+            })
             .state(OrderStates.FULFILLED)
-            .state(OrderStates.CANCELLED)
+            .end(OrderStates.FULFILLED)
+            .end(OrderStates.CANCELLED)
         ;
     }
 
