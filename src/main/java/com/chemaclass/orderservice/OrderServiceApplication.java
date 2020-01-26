@@ -1,16 +1,23 @@
 package com.chemaclass.orderservice;
 
 import lombok.extern.java.Log;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
+import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.statemachine.state.State;
+import org.springframework.stereotype.Component;
 
 @SpringBootApplication
 public class OrderServiceApplication {
@@ -32,6 +39,32 @@ enum OrderStates {
     PAID,
     FULFILLED,
     CANCELLED,
+}
+
+@Log
+@Component
+class Runner implements ApplicationRunner {
+    private final StateMachineFactory<OrderStates, OrderEvents> factory;
+
+    Runner(StateMachineFactory<OrderStates, OrderEvents> factory) {
+        this.factory = factory;
+    }
+
+    @Override
+    public void run(ApplicationArguments args) throws Exception {
+        StateMachine<OrderStates, OrderEvents> machine = this.factory.getStateMachine("anyId");
+        machine.start();
+        log.info("INIT state: " + machine.getState().getId().name());
+        machine.sendEvent(OrderEvents.PAY);
+        log.info("Current state: " + machine.getState().getId().name());
+
+        Message<OrderEvents> events = MessageBuilder
+            .withPayload(OrderEvents.FULFILL)
+            .setHeader("name", "value")
+            .build();
+        machine.sendEvent(events);
+        log.info("Current state: " + machine.getState().getId().name());
+    }
 }
 
 @Log
